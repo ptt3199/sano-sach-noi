@@ -66,11 +66,12 @@ export interface UninstallResult {
   dir: string
 }
 
-export interface DocxFile {
+export interface SourceFile {
   path: string
   name: string
   size: number
 }
+export type DocxFile = SourceFile
 
 export interface OutlineSection {
   stem: string
@@ -86,6 +87,7 @@ export interface OutlineChapter {
 }
 export interface Outline {
   title: string
+  author?: string
   fileTitle: string
   chapters: OutlineChapter[]
   sections: number
@@ -267,11 +269,11 @@ interface GoApp {
   TermsStatus(): Promise<TermsStatus>
   AcceptTerms(version: number): Promise<TermsStatus>
   QuitApp(): Promise<void>
-  ChooseDocx(): Promise<DocxFile | null>
-  DescribeDocx(path: string): Promise<DocxFile>
-  SampleDocx(): Promise<DocxFile>
+  ChooseSource(): Promise<SourceFile | null>
+  DescribeSource(path: string): Promise<SourceFile>
+  SampleDocx(): Promise<SourceFile>
   SaveSampleDocx(): Promise<string>
-  InspectDocx(path: string, keepHeadingNumbers: boolean): Promise<Outline>
+  InspectSource(path: string, keepHeadingNumbers: boolean): Promise<Outline>
   Voices(): Promise<Voice[]>
   PreviewClips(s: BookSettings, stems: string[]): Promise<Clip[]>
   SpeakSample(voice: string, text: string): Promise<string>
@@ -464,19 +466,22 @@ export async function thirdPartyNotices(): Promise<string> {
   return (await goApp()?.ThirdPartyNotices()) ?? ''
 }
 
-/** Mở hộp chọn file .docx của hệ điều hành. Huỷ → null. */
-export async function chooseDocx(): Promise<DocxFile | null> {
+/** Mở hộp chọn tài liệu DOCX hoặc EPUB của hệ điều hành. Huỷ → null. */
+export async function chooseSource(): Promise<SourceFile | null> {
   const app = goApp()
   if (!app) return { path: '/giả/ky-nang-giao-tiep.docx', name: 'ky-nang-giao-tiep.docx', size: 1_468_006 }
-  return app.ChooseDocx()
+  return app.ChooseSource()
 }
 
-export async function describeDocx(path: string): Promise<DocxFile> {
-  return need().DescribeDocx(path)
+export async function describeSource(path: string): Promise<SourceFile> {
+  return need().DescribeSource(path)
 }
+
+export const chooseDocx = chooseSource
+export const describeDocx = describeSource
 
 /** Ghi file Word mẫu vào ~/Sano/.tam để thử tạo sách khi chưa có tài liệu. */
-export async function sampleDocx(): Promise<DocxFile> {
+export async function sampleDocx(): Promise<SourceFile> {
   return need().SampleDocx()
 }
 
@@ -487,11 +492,13 @@ export async function saveSampleDocx(): Promise<string> {
   return app.SaveSampleDocx()
 }
 
-export async function inspectDocx(path: string, keepHeadingNumbers: boolean): Promise<Outline> {
+export async function inspectSource(path: string, keepHeadingNumbers: boolean): Promise<Outline> {
   const app = goApp()
   if (!app) return mockOutline()
-  return app.InspectDocx(path, keepHeadingNumbers)
+  return app.InspectSource(path, keepHeadingNumbers)
 }
+
+export const inspectDocx = inspectSource
 
 export async function listVoices(): Promise<Voice[]> {
   const app = goApp()

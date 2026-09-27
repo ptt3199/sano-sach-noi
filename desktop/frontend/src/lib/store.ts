@@ -3,13 +3,13 @@
 // Một cuốn render một lúc: đang render thì bấm "Tạo sách mới" mở màn tiến độ.
 import { computed, reactive } from 'vue'
 import {
-  cancelRender as goCancelRender, checkTTS, describeDocx, errText, inspectDocx, library as goLibrary,
+  cancelRender as goCancelRender, checkTTS, describeSource, errText, inspectSource, library as goLibrary,
   listVoices, onEvent, previewClips, renderStatus, startRender as goStartRender, version as goVersion,
   cancelSetup as goCancelSetup, mockSetupStatus, setupInfo as goSetupInfo, setupStatus as goSetupStatus,
   startSetup as goStartSetup, acceptTermsVersion, termsStatus, checkUpdate,
   startUpdate as goStartUpdate, cancelUpdate as goCancelUpdate, updateStatus as goUpdateStatus,
   applyUpdate as goApplyUpdate, applyUpdateOnQuit as goApplyUpdateOnQuit,
-  type BookSettings, type TermsStatus, type Clip, type DocxFile, type LibraryInfo, type Outline, type ReadingEdit,
+  type BookSettings, type TermsStatus, type Clip, type SourceFile, type LibraryInfo, type Outline, type ReadingEdit,
   type RenderStatus, type SetupInfo, type SetupStatus, type TTSStatus, type UpdateInfo, type UpdateStatus, type Voice,
 } from './backend'
 import { TERMS_VERSION } from './terms'
@@ -89,7 +89,7 @@ export const state = reactive({
   setupError: '', // lỗi khi bấm Cài (vd đang render) — khác lỗi trong lúc cài
 
   // B1 Nạp file
-  file: null as DocxFile | null,
+  file: null as SourceFile | null,
   fileError: '',
   loading: false,
   outline: null as Outline | null,
@@ -271,16 +271,17 @@ export function resetCreate() {
 
 // ── B1: nạp file thật ─────────────────────────────────────────────────────
 
-export async function setFile(f: DocxFile) {
+export async function setFile(f: SourceFile) {
   state.file = f
   state.fileError = ''
   state.loading = true
   state.outline = null
   try {
-    const o = await inspectDocx(f.path, state.keepHeadingNumbers)
+    const o = await inspectSource(f.path, state.keepHeadingNumbers)
     state.outline = o
     state.toc = buildToc(o)
-    state.title = o.title || capitalize(o.fileTitle || f.name.replace(/\.docx$/i, '').replace(/[-_]+/g, ' ').trim())
+    state.title = o.title || capitalize(o.fileTitle || f.name.replace(/\.(docx|epub)$/i, '').replace(/[-_]+/g, ' ').trim())
+    state.author = o.author || ''
     state.sampleSentence = o.sampleSentence
     state.clips = []
     state.heard = []
@@ -302,7 +303,7 @@ export async function reloadOutline() {
   if (!state.file) return
   const keep = new Set(selectedStems.value)
   try {
-    const o = await inspectDocx(state.file.path, state.keepHeadingNumbers)
+    const o = await inspectSource(state.file.path, state.keepHeadingNumbers)
     state.outline = o
     state.toc = buildToc(o).map((c) => ({
       ...c,
@@ -317,7 +318,7 @@ export async function reloadOutline() {
 /** Đường thử luồng thật khi phát triển: ?docx=/đường/dẫn/file.docx (chỉ bản dev). */
 export async function loadDocxPath(path: string) {
   try {
-    await setFile(await describeDocx(path))
+    await setFile(await describeSource(path))
   } catch (e) {
     state.fileError = errText(e)
   }

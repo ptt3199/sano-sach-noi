@@ -21,6 +21,13 @@ func TestDescribeDocx(t *testing.T) {
 	if got.Name != "Sách mẫu.DOCX" || got.Size != 5 || got.Path != doc {
 		t.Errorf("sai thông tin file: %+v", got)
 	}
+	epub := filepath.Join(dir, "Sách mẫu.EPUB")
+	if err := os.WriteFile(epub, []byte("123456"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := describeSource(epub); err != nil || got.Size != 6 {
+		t.Errorf("EPUB phải được nhận, got=%+v err=%v", got, err)
+	}
 
 	if _, err := describeDocx(filepath.Join(dir, "a.pdf")); !errors.Is(err, ErrNotDocx) {
 		t.Errorf("file .pdf phải trả ErrNotDocx, được %v", err)

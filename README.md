@@ -4,6 +4,8 @@
 
 <p align="center">Biến tài liệu của chính bạn thành sách nói. Giọng đọc AI tiếng Việt chạy ngay trên máy tính.<br>Miễn phí · Mã nguồn mở · Không cần API key · Windows, macOS, Linux</p>
 
+> **Về fork này:** Đây là bản fork từ [Sano của Bùi Tấn Việt](https://github.com/tanviet12/sano-sach-noi). Fork này chỉ bổ sung khả năng nhận và xử lý file EPUB làm đầu vào tạo sách nói; hướng dẫn và tính năng gốc vẫn được giữ nguyên.
+
 <p align="center">
   <a href="https://github.com/tanviet12/sano-sach-noi/releases/latest"><img src="https://img.shields.io/github/v/release/tanviet12/sano-sach-noi?label=b%E1%BA%A3n%20m%E1%BB%9Bi%20nh%E1%BA%A5t&color=c60505" alt="Bản mới nhất"></a>
   <a href="./LICENSE"><img src="https://img.shields.io/badge/gi%E1%BA%A5y%20ph%C3%A9p-MIT-blue" alt="Giấy phép MIT"></a>
@@ -36,7 +38,7 @@
 5 cuốn sách mẫu tự viết, mỗi cuốn một giọng, tạo hoàn toàn bằng Sano. Bấm để nghe chương 1 ngay trong trình duyệt, hoặc mở **[trang nghe thử](https://tanviet12.github.io/sano-sach-noi/demo)** để nghe đủ 3 chương mỗi cuốn và so 12 giọng đọc cùng một đoạn.
 
 | | Sách | Giọng | Nghe |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | <img src="docs/public/audio/demo/ky-nang-mem-cho-nguoi-tre.jpg" width="56" alt=""> | Kỹ năng mềm cho người trẻ | Hải Đăng · nam · Bắc | [Chương 1 ▶](https://tanviet12.github.io/sano-sach-noi/audio/demo/ky-nang-mem-cho-nguoi-tre-1.mp3) |
 | <img src="docs/public/audio/demo/tam-ly-tich-cuc.jpg" width="56" alt=""> | Tâm lý tích cực | Trúc Ly · nữ · Bắc | [Chương 1 ▶](https://tanviet12.github.io/sano-sach-noi/audio/demo/tam-ly-tich-cuc-1.mp3) |
 | <img src="docs/public/audio/demo/khoi-nghiep-tu-so-0.jpg" width="56" alt=""> | Khởi nghiệp từ số 0 | Thái Sơn · nam · Nam | [Chương 1 ▶](https://tanviet12.github.io/sano-sach-noi/audio/demo/khoi-nghiep-tu-so-0-1.mp3) |
@@ -73,7 +75,7 @@ Một file M4B có mục lục chương, tên sách, bìa, khoảng 29 MB cho m�
 ## Tải về
 
 | Máy | Tải | Ghi chú |
-|---|---|---|
+| --- | --- | --- |
 | **Windows** 10/11 | [Bộ cài .exe](https://github.com/tanviet12/sano-sach-noi/releases/download/v0.1.10/Sano-0.1.10-windows-amd64-setup.exe) · [Bản portable .zip](https://github.com/tanviet12/sano-sach-noi/releases/download/v0.1.10/Sano-0.1.10-windows-amd64-portable.zip) | không cần quyền admin |
 | **macOS** 10.13+ | [Sano .dmg](https://github.com/tanviet12/sano-sach-noi/releases/download/v0.1.10/Sano-0.1.10-macos-universal.dmg) | Apple Silicon và Intel |
 | **Linux** x86_64 | [Sano .AppImage](https://github.com/tanviet12/sano-sach-noi/releases/download/v0.1.10/Sano-0.1.10-linux-amd64.AppImage) | cần WebKitGTK 4.1 |
@@ -156,7 +158,7 @@ make desktop-test     # go vet + go test + typecheck giao diện của desktop/
 make test             # go test module gốc (tạo sách, bìa, M4B, script đọc giọng)
 ```
 
-Chỉ sửa giao diện, không cần Go: `cd desktop/frontend && npm install && npm run dev` rồi mở http://localhost:5390 (dữ liệu giả).
+Chỉ sửa giao diện, không cần Go: `cd desktop/frontend && npm install && npm run dev` rồi mở <http://localhost:5390> (dữ liệu giả).
 
 Tạo sách bằng dòng lệnh, không cần mở phần mềm:
 

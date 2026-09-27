@@ -17,7 +17,7 @@ import (
 type SectionImage struct {
 	RelID string // r:embed / r:id trong document.xml
 	// Name — tên file do Sano đặt (img%03d<đuôi>, theo thứ tự gặp trong sách),
-	// KHÔNG lấy tên trong file Word: tên đó do người soạn tài liệu quyết định,
+	// KHÔNG lấy tên trong tài liệu: tên đó do người soạn quyết định,
 	// có thể chứa ..\ để ghi ra ngoài thư mục sách.
 	Name string
 	Data []byte // nội dung file ảnh
@@ -42,6 +42,9 @@ type Chapter struct {
 // Book — cấu trúc nhiều cấp trích từ docx.
 type Book struct {
 	Title    string
+	Author   string
+	Cover    []byte // ảnh bìa nhúng trong EPUB, nếu có
+	CoverExt string // đuôi ảnh an toàn của bìa nhúng
 	Chapters []Chapter
 	Stats    DocStats // số liệu để cảnh báo lúc nạp
 }

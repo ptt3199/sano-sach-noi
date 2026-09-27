@@ -1,11 +1,11 @@
 <script setup lang="ts">
-// B1 Nạp file: hộp chọn file .docx (Wails) hoặc kéo thả → nạp thật: mục lục,
+// B1 Nạp file: hộp chọn DOCX/EPUB (Wails) hoặc kéo thả → nạp thật: mục lục,
 // số ký tự, cảnh báo lúc nạp (hình, bảng, tiêu đề gõ tay, viết tắt chưa có).
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { AlertTriangle, Check, CheckCircle2, Copy, Download, FileText, Loader2, ShieldCheck, Sparkles, Upload, X } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import BookCover from '@/components/sano/BookCover.vue'
-import { chooseCover, chooseDocx, copyText, describeDocx, errText, onFileDrop, sampleDocx, saveSampleDocx } from '../../lib/backend'
+import { chooseCover, chooseSource, copyText, describeSource, errText, onFileDrop, sampleDocx, saveSampleDocx } from '../../lib/backend'
 import { DOCS } from '../../lib/mock'
 import { SAMPLE_PROMPT } from '../../lib/prompt'
 import { categoryCounts } from '../../lib/find'
@@ -19,7 +19,7 @@ const coverError = ref('')
 async function pick() {
   picking.value = true
   try {
-    const f = await chooseDocx()
+    const f = await chooseSource()
     if (f) await setFile(f)
   } catch (e) {
     state.fileError = errText(e)
@@ -34,7 +34,7 @@ onMounted(() => {
     const p = paths[0]
     if (!p || state.loading) return
     try {
-      await setFile(await describeDocx(p))
+      await setFile(await describeSource(p))
     } catch (e) {
       state.fileError = errText(e)
     }
@@ -56,7 +56,7 @@ const savedDir = computed(() => savedSample.value.split(/[\\/]/).slice(-2, -1)[0
 async function useSaved() {
   picking.value = true
   try {
-    await setFile(await describeDocx(savedSample.value))
+    await setFile(await describeSource(savedSample.value))
   } catch (e) {
     state.fileError = errText(e)
   } finally {
@@ -116,9 +116,9 @@ const fake = computed(() => (w.value?.fakeHeadings ?? []).slice(0, 2).map((s) =>
 
 <template>
   <div class="max-w-2xl">
-    <h1 class="text-xl font-semibold tracking-tight">Nạp file Word</h1>
+    <h1 class="text-xl font-semibold tracking-tight">Nạp tài liệu</h1>
     <p class="text-sm text-muted-foreground">
-      Sano đọc mục lục từ kiểu Heading 1 / Heading 2 trong file.
+      DOCX dùng kiểu Heading 1 / Heading 2; EPUB dùng mục lục có sẵn trong sách.
       <a :href="DOCS + '/tao-sach-dau-tien#chuan-bi-file'" target="_blank" rel="noopener" class="text-primary hover:underline">Cách chuẩn bị file để đọc hay nhất</a>
     </p>
 
@@ -126,7 +126,7 @@ const fake = computed(() => (w.value?.fakeHeadings ?? []).slice(0, 2).map((s) =>
       <button class="mt-5 w-full h-56 rounded-xl border-2 border-dashed border-border grid place-items-center hover:border-primary/50 hover:bg-primary/5" :disabled="picking" @click="pick">
         <span class="text-center">
           <Upload class="w-8 h-8 mx-auto text-muted-foreground" />
-          <span class="block mt-3 font-medium">Kéo file .docx vào đây</span>
+          <span class="block mt-3 font-medium">Kéo file .docx hoặc .epub vào đây</span>
           <span class="block text-sm text-muted-foreground">hoặc bấm để chọn file</span>
         </span>
       </button>

@@ -1,5 +1,5 @@
 // Command sano-docx2tts là pipeline tạo sách nói tự động: đưa 1 file
-// .docx của cẩm nang → trích mục lục nhiều cấp (cấp heading nhỏ nhất = chương,
+// .docx hoặc .epub → trích mục lục nhiều cấp (cấp heading nhỏ nhất = chương,
 // các cấp lớn hơn = tiểu mục) → chuẩn hóa cách đọc (giữ lời gốc) → sinh mô tả ảnh slide →
 // pre-render TTS bằng VieNeu-TTS → đóng gói thành thư mục audiobook + metadata.json
 // → (tùy chọn) gói zip chuẩn để sao lưu / chuyển máy.
@@ -36,9 +36,9 @@ import (
 
 func main() {
 	var (
-		input      = flag.String("input", "", "file .docx nguồn (bắt buộc)")
+		input      = flag.String("input", "", "file .docx hoặc .epub nguồn (bắt buộc)")
 		outputDir  = flag.String("output-dir", "", "thư mục đầu ra (bắt buộc)")
-		title      = flag.String("title", "", "ghi đè tiêu đề sách (mặc định: lấy từ docx)")
+		title      = flag.String("title", "", "ghi đè tiêu đề sách (mặc định: lấy từ nguồn)")
 		author     = flag.String("author", "", "tác giả")
 		desc       = flag.String("description", "", "mô tả sách")
 		introText  = flag.String("intro-text", "", "đoạn intro/branding đọc đầu sách (mục đầu tiên, tên = tiêu đề sách); trống = không có intro")
@@ -53,7 +53,7 @@ func main() {
 		headingNum = flag.String("heading-numbers", bookmaker.HeadingNumbersDrop, "số đầu tiêu đề khi đọc (\"1.2.3. Tên\"): drop = bỏ, chỉ đọc \"Tên\"; keep = đọc \"một chấm hai chấm ba\"")
 		dropTOC    = flag.Bool("drop-toc", true, "tự bỏ trang mục lục khỏi bản đọc (tiêu đề Mục lục/Nội dung/Table of Contents, hoặc phần lớn dòng kết thúc bằng số trang); --drop-toc=false để giữ")
 		cover      = flag.String("cover", "", "ảnh bìa (jpg/jpeg/png/webp); trống = tự vẽ bìa theo tên sách")
-		coverFirst = flag.Bool("cover-first-image", false, "khi không có --cover: dùng ảnh đầu tiên trong file Word làm bìa thay vì tự vẽ")
+		coverFirst = flag.Bool("cover-first-image", false, "khi không có --cover: dùng ảnh đầu tiên trong tài liệu làm bìa thay vì bìa nhúng/tự vẽ")
 		ttsPython  = flag.String("tts-python", "", "python venv VieNeu-TTS v3 (mặc định ~/VieNeu-TTS-v3/.venv/bin/python; Windows: .venv\\Scripts\\python.exe)")
 		ttsScript  = flag.String("tts-script", "", "audio_gen_batch.py (mặc định: bin/../scripts/tts/ cạnh file chạy, không có thì dùng bản nhúng trong chương trình; KHÔNG tìm theo thư mục hiện tại — muốn dùng script trong repo đang sửa thì truyền cờ này)")
 		ffmpegBin  = flag.String("ffmpeg", "ffmpeg", "binary ffmpeg")
@@ -62,7 +62,7 @@ func main() {
 		pronFile   = flag.String("pronunciations", "", "file TSV bổ sung/ghi đè từ điển cách đọc viết tắt (mỗi dòng \"<viết tắt><TAB><cách đọc>\"; cách đọc trống = tắt mục mặc định)")
 		keepTxt    = flag.Bool("keep-txt", false, "giữ lại file <stem>.txt đã nạp cho TTS trong output-dir (soát lời đọc 1:1 với audio nếu có chỗ phát sai)")
 		outputZip  = flag.String("output-zip", "", "đóng gói thêm file zip chuẩn ở đường dẫn này (sao lưu / chuyển máy; xem docs/book-zip-format.md)")
-		repackDir  = flag.String("repack-dir", "", "đóng gói LẠI zip từ thư mục đã render sẵn (mp3 + metadata.json) — KHÔNG cần --input docx, KHÔNG render TTS; dùng khi sửa lẻ vài tiểu mục rồi đóng gói lại. Cần --output-zip (+ --voice cho voice_id)")
+		repackDir  = flag.String("repack-dir", "", "đóng gói LẠI zip từ thư mục đã render sẵn (mp3 + metadata.json) — KHÔNG cần --input, KHÔNG render TTS; dùng khi sửa lẻ vài tiểu mục rồi đóng gói lại. Cần --output-zip (+ --voice cho voice_id)")
 		m4bOut     = flag.String("m4b", "", "xuất thêm một file .m4b (AAC, mục lục chương, bìa nhúng — nghe trên Apple Books, app sách nói Android, màn hình xe) ở đường dẫn này sau khi render xong")
 		m4bFromDir = flag.String("m4b-from-dir", "", "chỉ xuất M4B từ thư mục sách đã render sẵn (metadata.json + chNN-secNN.mp3), KHÔNG cần --input, KHÔNG render; lưu ở --m4b (mặc định <thư mục>/<Tên sách>.m4b)")
 		m4bBitrate = flag.String("m4b-bitrate", m4b.DefaultBitrate, "bitrate AAC mono của file M4B (64k đủ cho giọng đọc, ~29 MB/giờ)")
@@ -119,8 +119,8 @@ func main() {
 		flag.Usage()
 		os.Exit(2)
 	}
-	if !strings.EqualFold(filepath.Ext(*input), ".docx") {
-		log.Fatalf("--input phải là file .docx: %q", *input)
+	if !bookmaker.IsSupportedSourcePath(*input) {
+		log.Fatalf("--input phải là file .docx hoặc .epub: %q", *input)
 	}
 	// Chuyển output-dir sang tuyệt đối: renderVieNeu đặt cwd của python = output-dir
 	// nhưng truyền path .txt theo output-dir; nếu output-dir tương đối thì path .txt
@@ -166,7 +166,7 @@ func main() {
 	tts.ScriptDir = filepath.Dir(tts.Script)
 
 	opts := bookmaker.Options{
-		InputDocx:       *input,
+		InputPath:       *input,
 		OutputDir:       *outputDir,
 		Title:           *title,
 		Author:          *author,

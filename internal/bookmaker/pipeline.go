@@ -43,8 +43,10 @@ type outSection struct {
 	ImageDescription string `json:"image_description,omitempty"`
 }
 
-// Options — tham số chạy pipeline docx → output folder (+ gói zip nếu cần).
+// Options — tham số chạy pipeline nguồn sách → output folder (+ gói zip nếu cần).
 type Options struct {
+	InputPath string
+	// InputDocx is kept for callers compiled against the DOCX-only API.
 	InputDocx         string
 	OutputDir         string
 	Title             string
@@ -60,7 +62,7 @@ type Options struct {
 	DropStems         map[string]bool // loại tiểu mục theo stem GỐC (ch%02d-sec%02d) trước khi đánh số lại
 	DropTOC           bool            // tự bỏ trang mục lục (tiêu đề Mục lục/Nội dung… hoặc dòng kết thúc bằng số trang)
 	CoverPath         string          // != "" → dùng ảnh bìa này thay bìa tự vẽ
-	CoverFirstImage   bool            // không có CoverPath → dùng ảnh đầu sách (mặc định: tự vẽ bìa)
+	CoverFirstImage   bool            // không có CoverPath → dùng ảnh đầu nội dung thay bìa nhúng/tự vẽ
 	OutputZip         string          // != "" → đóng gói thêm zip chuẩn ở đường dẫn này
 	Logf              func(string, ...any)
 
@@ -74,7 +76,7 @@ type Options struct {
 	Progress func(Progress)
 }
 
-// IntroStem — stem gốc dành cho lời mở đầu (không có trong file Word).
+// IntroStem — stem gốc dành cho lời mở đầu (không có trong file nguồn).
 const IntroStem = "intro"
 
 // ReadingEdit — thay phần đầu lời đọc của một tiểu mục.
@@ -116,7 +118,7 @@ type prepared struct {
 	secCount   int
 }
 
-// Run thực thi toàn bộ: parse docx → chuẩn hóa → ảnh → TTS → metadata.json
+// Run thực thi toàn bộ: parse nguồn → chuẩn hóa → ảnh → TTS → metadata.json
 // → (tùy chọn) gói zip. Trả tổng số tiểu mục đã build.
 func Run(opts Options) (int, error) {
 	return RunContext(context.Background(), opts)
@@ -140,8 +142,11 @@ func RunContext(ctx context.Context, opts Options) (int, error) {
 	}
 	meta, jobs, secCount := p.meta, p.jobs, p.secCount
 
-	// Bìa: ảnh user chọn → (tuỳ chọn) ảnh đầu sách → bìa tự vẽ theo tên sách.
-	coverName, err := opts.writeCover(p.firstImage, p.title)
+	if strings.TrimSpace(opts.Author) == "" {
+		opts.Author = p.meta.Author
+	}
+	// Bìa: ảnh user chọn → ảnh đầu nội dung nếu bật → bìa EPUB → bìa tự vẽ.
+	coverName, err := opts.writeCoverWithSource(p.firstImage, p.title, p.book.Cover, p.book.CoverExt)
 	if err != nil {
 		return 0, err
 	}
@@ -211,10 +216,11 @@ func (o Options) norm() *Normalizer {
 	return o.Norm
 }
 
-// prepare nạp docx, bỏ tiểu mục theo DropStems / trang mục lục, ghi ảnh ra
+// prepare nạp nguồn sách, bỏ tiểu mục theo DropStems / trang mục lục, ghi ảnh ra
 // OutputDir/images và dựng lời đọc cho từng tiểu mục. Chưa render audio.
 func (opts Options) prepare() (*prepared, error) {
-	book, err := ParseDocx(opts.InputDocx)
+	inputPath := opts.sourcePath()
+	book, err := ParseSource(inputPath)
 	if err != nil {
 		return nil, err
 	}
@@ -231,14 +237,14 @@ func (opts Options) prepare() (*prepared, error) {
 		p.dropped = dropTOCSections(book)
 	}
 
-	p.title = firstNonEmpty(opts.Title, book.Title, titleFromDocxName(opts.InputDocx))
+	p.title = firstNonEmpty(opts.Title, book.Title, titleFromSourceName(inputPath))
 	if err := os.MkdirAll(filepath.Join(opts.OutputDir, "images"), 0o755); err != nil {
 		return nil, fmt.Errorf("tạo thư mục output: %w", err)
 	}
 
 	p.meta = outMeta{
 		Title:             p.title,
-		Author:            opts.Author,
+		Author:            firstNonBlank(opts.Author, book.Author),
 		Narrator:          narratorLabel(opts.TTS),
 		Description:       opts.Description,
 		Language:          "vi",
@@ -248,7 +254,7 @@ func (opts Options) prepare() (*prepared, error) {
 		RightsConfirmedAt: opts.RightsConfirmedAt,
 	}
 
-	// Intro/branding chiếm chương 1 (nếu có) → chương docx dời xuống ch02+.
+	// Intro/branding chiếm chương 1 (nếu có) → chương nguồn dời xuống ch02+.
 	introOffset := 0
 	if opts.IntroText != "" {
 		introOffset = 1
@@ -328,7 +334,7 @@ func sectionReading(norm *Normalizer, sec Section) string {
 }
 
 // applyReadingEdit thay phần đầu e.From của lời đọc bằng e.To. Lời đọc không
-// còn bắt đầu bằng e.From (file Word đã đổi) → giữ nguyên, không đoán.
+// còn bắt đầu bằng e.From (file nguồn đã đổi) → giữ nguyên, không đoán.
 func applyReadingEdit(reading string, e ReadingEdit) string {
 	if e.From == "" || !strings.HasPrefix(reading, e.From) {
 		return reading
@@ -421,6 +427,10 @@ func (o Options) processImages(sec Section, chapterTitle string, written map[str
 // sách nếu bật --cover-first-image; còn lại tự vẽ bìa theo tên sách (internal/cover,
 // cùng thiết kế bìa mặc định trong phần mềm). Trả tên file bìa trong output-dir.
 func (o Options) writeCover(first *SectionImage, title string) (string, error) {
+	return o.writeCoverWithSource(first, title, nil, "")
+}
+
+func (o Options) writeCoverWithSource(first *SectionImage, title string, sourceCover []byte, sourceCoverExt string) (string, error) {
 	if o.CoverPath != "" {
 		ext := strings.ToLower(filepath.Ext(o.CoverPath))
 		switch ext {
@@ -444,6 +454,19 @@ func (o Options) writeCover(first *SectionImage, title string) (string, error) {
 			name = "cover.png"
 		}
 		if err := os.WriteFile(filepath.Join(o.OutputDir, name), first.Data, 0o644); err != nil {
+			return "", fmt.Errorf("ghi bìa: %w", err)
+		}
+		return name, nil
+	}
+	if len(sourceCover) > 0 {
+		ext := strings.ToLower(sourceCoverExt)
+		switch ext {
+		case ".jpg", ".jpeg", ".png", ".webp":
+		default:
+			ext = ".png"
+		}
+		name := "cover" + ext
+		if err := os.WriteFile(filepath.Join(o.OutputDir, name), sourceCover, 0o644); err != nil {
 			return "", fmt.Errorf("ghi bìa: %w", err)
 		}
 		return name, nil
@@ -480,12 +503,6 @@ func narratorLabel(c TTSConfig) string {
 		return "VieNeu-TTS (stub)"
 	}
 	return "VieNeu-TTS (" + c.Voice + ")"
-}
-
-func titleFromDocxName(p string) string {
-	base := strings.TrimSuffix(filepath.Base(p), filepath.Ext(p))
-	base = strings.NewReplacer("-", " ", "_", " ").Replace(base)
-	return strings.TrimSpace(base)
 }
 
 func firstNonEmpty(vals ...string) string {

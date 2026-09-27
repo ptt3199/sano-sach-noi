@@ -8,7 +8,6 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"strings"
 	"sync"
 	"time"
 
@@ -127,28 +126,31 @@ func ttsNeedsResync() bool {
 	return setup.NeedsResync(l, pins, ttsscripts.Files)
 }
 
-// DocxFile mô tả file Word người dùng chọn.
-type DocxFile struct {
+// SourceFile mô tả tài liệu nguồn người dùng chọn.
+type SourceFile struct {
 	Path string `json:"path"`
 	Name string `json:"name"`
 	Size int64  `json:"size"`
 }
 
-// ErrNotDocx — file không phải .docx.
-var ErrNotDocx = errors.New("chỉ nhận file Word .docx")
+// DocxFile giữ tương thích với các binding cũ.
+type DocxFile = SourceFile
+
+// ErrNotDocx giữ tên cũ; nguồn hiện hỗ trợ DOCX và EPUB.
+var ErrNotDocx = errors.New("chỉ nhận file .docx hoặc .epub")
 
 // ErrRightsNotConfirmed — chưa tick xác nhận có quyền dùng tài liệu (bước Nghe thử).
 var ErrRightsNotConfirmed = errors.New("hãy xác nhận bạn có quyền dùng tài liệu này trước khi render")
 
-// ChooseDocx mở hộp chọn file của hệ điều hành, chỉ lọc .docx.
+// ChooseSource mở hộp chọn tài liệu nguồn của hệ điều hành.
 // Người dùng bấm huỷ → trả (nil, nil).
-func (a *App) ChooseDocx() (*DocxFile, error) {
+func (a *App) ChooseSource() (*SourceFile, error) {
 	if a.ctx == nil {
 		return nil, errors.New("ứng dụng chưa khởi động xong")
 	}
 	path, err := wruntime.OpenFileDialog(a.ctx, wruntime.OpenDialogOptions{
-		Title:   "Chọn file Word",
-		Filters: []wruntime.FileFilter{{DisplayName: "File Word (*.docx)", Pattern: "*.docx"}},
+		Title:   "Chọn tài liệu nguồn",
+		Filters: []wruntime.FileFilter{{DisplayName: "Tài liệu (*.docx; *.epub)", Pattern: "*.docx;*.epub"}},
 	})
 	if err != nil {
 		return nil, fmt.Errorf("mở hộp chọn file: %w", err)
@@ -156,16 +158,26 @@ func (a *App) ChooseDocx() (*DocxFile, error) {
 	if path == "" {
 		return nil, nil
 	}
-	return describeDocx(path)
+	return describeSource(path)
 }
 
-// DescribeDocx đọc thông tin file .docx được kéo thả vào cửa sổ.
-func (a *App) DescribeDocx(path string) (*DocxFile, error) {
-	return describeDocx(path)
+// ChooseDocx giữ tương thích với binding cũ.
+func (a *App) ChooseDocx() (*DocxFile, error) { return a.ChooseSource() }
+
+// DescribeSource đọc thông tin tài liệu được kéo thả vào cửa sổ.
+func (a *App) DescribeSource(path string) (*SourceFile, error) {
+	return describeSource(path)
 }
 
-func describeDocx(path string) (*DocxFile, error) {
-	if !strings.EqualFold(filepath.Ext(path), ".docx") {
+// DescribeDocx giữ tương thích với binding cũ.
+func (a *App) DescribeDocx(path string) (*DocxFile, error) { return a.DescribeSource(path) }
+
+func isBookSourcePath(path string) bool {
+	return bookmaker.IsSupportedSourcePath(path)
+}
+
+func describeSource(path string) (*SourceFile, error) {
+	if !isBookSourcePath(path) {
 		return nil, ErrNotDocx
 	}
 	info, err := os.Stat(path)
@@ -175,5 +187,7 @@ func describeDocx(path string) (*DocxFile, error) {
 	if info.IsDir() {
 		return nil, ErrNotDocx
 	}
-	return &DocxFile{Path: path, Name: info.Name(), Size: info.Size()}, nil
+	return &SourceFile{Path: path, Name: info.Name(), Size: info.Size()}, nil
 }
+
+func describeDocx(path string) (*DocxFile, error) { return describeSource(path) }

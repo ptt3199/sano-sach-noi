@@ -69,6 +69,10 @@ func TestBookSettingsOptions(t *testing.T) {
 		t.Errorf("TTS sai: %+v", o.TTS)
 	}
 	if _, err := (BookSettings{Path: "/tmp/a.pdf"}).options(toolPaths{}, "/out"); err == nil {
-		t.Error("file không phải .docx phải lỗi")
+		t.Error("file không phải DOCX/EPUB phải lỗi")
+	}
+	epubOptions, err := (BookSettings{Path: "/tmp/book.epub"}).options(toolPaths{}, "/out")
+	if err != nil || epubOptions.InputPath != "/tmp/book.epub" {
+		t.Errorf("EPUB phải được đưa vào pipeline, options=%+v err=%v", epubOptions, err)
 	}
 }

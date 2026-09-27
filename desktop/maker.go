@@ -126,7 +126,7 @@ func (t toolPaths) ttsConfig(voice string) bookmaker.TTSConfig {
 
 // options dựng bookmaker.Options từ lựa chọn của người dùng.
 func (s BookSettings) options(t toolPaths, outDir string) (bookmaker.Options, error) {
-	if !strings.EqualFold(filepath.Ext(s.Path), ".docx") {
+	if !isBookSourcePath(s.Path) {
 		return bookmaker.Options{}, ErrNotDocx
 	}
 	norm, err := bookmaker.NewNormalizer("", s.KeepHeadingNumbers)
@@ -138,7 +138,7 @@ func (s BookSettings) options(t toolPaths, outDir string) (bookmaker.Options, er
 		drop[st] = true
 	}
 	return bookmaker.Options{
-		InputDocx:         s.Path,
+		InputPath:         s.Path,
 		OutputDir:         outDir,
 		Title:             strings.TrimSpace(s.Title),
 		Author:            strings.TrimSpace(s.Author),
@@ -153,12 +153,17 @@ func (s BookSettings) options(t toolPaths, outDir string) (bookmaker.Options, er
 	}, nil
 }
 
-// InspectDocx nạp file Word thật: mục lục, số ký tự, cảnh báo lúc nạp.
-func (a *App) InspectDocx(path string, keepHeadingNumbers bool) (*bookmaker.Outline, error) {
-	if _, err := describeDocx(path); err != nil {
+// InspectSource nạp tài liệu thật: mục lục, số ký tự, cảnh báo lúc nạp.
+func (a *App) InspectSource(path string, keepHeadingNumbers bool) (*bookmaker.Outline, error) {
+	if _, err := describeSource(path); err != nil {
 		return nil, err
 	}
 	return bookmaker.Inspect(path, bookmaker.InspectOptions{KeepHeadingNumbers: keepHeadingNumbers})
+}
+
+// InspectDocx giữ tương thích với binding cũ.
+func (a *App) InspectDocx(path string, keepHeadingNumbers bool) (*bookmaker.Outline, error) {
+	return a.InspectSource(path, keepHeadingNumbers)
 }
 
 // Voices trả danh sách giọng của bộ đọc (hỏi bộ đọc lần đầu rồi nhớ lại).
