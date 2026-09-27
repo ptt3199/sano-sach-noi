@@ -1,14 +1,14 @@
 <script setup lang="ts">
 // B1 Nạp file: hộp chọn DOCX/EPUB (Wails) hoặc kéo thả → nạp thật: mục lục,
 // số ký tự, cảnh báo lúc nạp (hình, bảng, tiêu đề gõ tay, viết tắt chưa có).
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { AlertTriangle, Check, CheckCircle2, Copy, Download, FileText, Loader2, ShieldCheck, Sparkles, Upload, X } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import BookCover from '@/components/sano/BookCover.vue'
 import { chooseCover, chooseSource, copyText, describeSource, errText, onFileDrop, sampleDocx, saveSampleDocx } from '../../lib/backend'
 import { DOCS } from '../../lib/mock'
 import { SAMPLE_PROMPT } from '../../lib/prompt'
-import { categoryCounts } from '../../lib/find'
+import { categoryCounts, seriesKey } from '../../lib/find'
 import { clearFile, setFile, state } from '../../lib/store'
 import CategoryPicker from '../../components/CategoryPicker.vue'
 
@@ -103,6 +103,23 @@ function fmtSize(bytes: number) {
 }
 
 const categories = computed(() => categoryCounts(state.library?.books ?? []))
+// Bộ sách đang có: [tên, số tập] + số tập đã dùng → gợi ý tập kế tiếp (wireframe D5).
+const seriesVols = computed(() => {
+  const m = new Map<string, [string, number[]]>()
+  for (const b of state.library?.books ?? []) {
+    if (!b.series) continue
+    const g = m.get(seriesKey(b.series)) ?? [b.series, []]
+    g[1].push(b.volume)
+    m.set(seriesKey(b.series), g)
+  }
+  return [...m.values()]
+})
+const seriesGroups = computed<[string, number][]>(() => seriesVols.value.map(([n, v]) => [n, v.length]))
+const taken = computed(() => seriesVols.value.find(([n]) => seriesKey(n) === seriesKey(state.series))?.[1] ?? [])
+watch(() => state.series, (n, old) => {
+  if (!n) state.volume = 0
+  else if (seriesKey(n) !== seriesKey(old ?? '')) state.volume = Math.max(0, ...taken.value) + 1
+})
 const w = computed(() => state.outline?.warnings)
 const chapterCount = computed(() => state.toc.filter((c) => c.kind === 'chapter').length)
 const acronyms = computed(() => {
@@ -195,10 +212,24 @@ const fake = computed(() => (w.value?.fakeHeadings ?? []).slice(0, 2).map((s) =>
             <input v-model="state.author" placeholder="Không bắt buộc" class="mt-1 w-full h-9 rounded-md border border-input bg-background px-3" />
           </label>
         </div>
-        <div class="mt-4 text-sm">
-          <span>Danh mục <span class="text-muted-foreground">· không bắt buộc</span></span>
-          <CategoryPicker v-model="state.category" :categories="categories" class="mt-1 w-1/2 pr-2" />
-          <p class="mt-1.5 text-xs text-muted-foreground">Dùng để lọc trong Thư viện.</p>
+        <div class="mt-4 grid grid-cols-2 gap-4 text-sm">
+          <div>
+            <span>Danh mục <span class="text-muted-foreground">· không bắt buộc</span></span>
+            <CategoryPicker v-model="state.category" :categories="categories" class="mt-1" />
+            <p class="mt-1.5 text-xs text-muted-foreground">Dùng để lọc trong Thư viện.</p>
+          </div>
+          <div>
+            <div class="flex gap-3">
+              <div class="flex-1 min-w-0">
+                <span>Bộ sách <span class="text-muted-foreground">· không bắt buộc</span></span>
+                <CategoryPicker v-model="state.series" kind="series" :categories="seriesGroups" class="mt-1" />
+              </div>
+              <label class="w-20 block shrink-0" :class="!state.series && 'opacity-40'">Tập số
+                <input :value="state.volume || ''" @input="state.volume = Math.floor(Number(($event.target as HTMLInputElement).value)) || 0" type="number" min="1" max="999" :disabled="!state.series" class="mt-1 w-full h-9 rounded-md border border-input bg-background px-3" />
+              </label>
+            </div>
+            <p class="mt-1.5 text-xs text-muted-foreground">{{ state.series && taken.length ? `Bộ "${state.series}" đang có tập ${[...taken].sort((a, b) => a - b).join(', ')}.` : 'Sách nhiều tập thì gom thành một bộ.' }}</p>
+          </div>
         </div>
         <div class="mt-4 flex items-center gap-4">
           <div class="h-24 w-[72px] rounded-md shadow-sm shrink-0 overflow-hidden">
